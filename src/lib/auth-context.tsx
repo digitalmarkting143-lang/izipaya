@@ -1,6 +1,25 @@
 "use client";
-import { useState, createContext, useContext, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
+
+interface Card {
+  id: string;
+  type: "virtual" | "physical";
+  last4: string;
+  status: "active" | "ordered";
+  issueDate: string;
+  expiryDate: string;
+  name: string;
+}
+
+interface Transaction {
+  id: string;
+  type: string;
+  amount: number;
+  status: "completed" | "pending";
+  date: string;
+  cardType: string;
+}
 
 interface User {
   email: string;
@@ -9,9 +28,13 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  cards: Card[];
+  transactions: Transaction[];
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   register: (email: string, password: string, name: string) => Promise<boolean>;
+  addCard: (type: "virtual" | "physical") => void;
+  addTransaction: (type: string, amount: number, cardType: string) => void;
   isLoading: boolean;
 }
 
@@ -25,14 +48,19 @@ const DEMO_USER = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [cards, setCards] = useState<Card[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    const stored = localStorage.getItem("izipay_user");
-    if (stored) {
-      setUser(JSON.parse(stored));
-    }
+    const storedUser = localStorage.getItem("izipay_user");
+    const storedCards = localStorage.getItem("izipay_cards");
+    const storedTransactions = localStorage.getItem("izipay_transactions");
+    
+    if (storedUser) setUser(JSON.parse(storedUser));
+    if (storedCards) setCards(JSON.parse(storedCards));
+    if (storedTransactions) setTransactions(JSON.parse(storedTransactions));
     setIsLoading(false);
   }, []);
 
@@ -90,8 +118,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   };
 
+  const addCard = (type: "virtual" | "physical") => {
+    const cardNum = type === "virtual" ? "8831" : "9927";
+    const newCard: Card = {
+      id: Date.now().toString(),
+      type,
+      last4: cardNum,
+      status: type === "virtual" ? "active" : "ordered",
+      issueDate: new Date().toLocaleDateString(),
+      expiryDate: "12/28",
+      name: "IZIPAY USER"
+    };
+    const updatedCards = [...cards, newCard];
+    setCards(updatedCards);
+    localStorage.setItem("izipay_cards", JSON.stringify(updatedCards));
+  };
+
+  const addTransaction = (type: string, amount: number, cardType: string) => {
+    const newTransaction: Transaction = {
+      id: Date.now().toString(),
+      type,
+      amount,
+      status: "completed",
+      date: new Date().toLocaleString(),
+      cardType
+    };
+    const updatedTransactions = [newTransaction, ...transactions];
+    setTransactions(updatedTransactions);
+    localStorage.setItem("izipay_transactions", JSON.stringify(updatedTransactions));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, register, isLoading }}>
+    <AuthContext.Provider value={{ user, cards, transactions, login, logout, register, addCard, addTransaction, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
@@ -101,12 +159,4 @@ export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
-}
-
-export function requireAuth() {
-  const { user } = useAuth();
-  const router = useRouter();
-  useEffect(() => {
-    if (!user) router.push("/login");
-  }, [user, router]);
 }

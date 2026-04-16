@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 
 export default function CardsPage() {
-  const { user } = useAuth();
+  const { user, cards } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -14,12 +14,12 @@ export default function CardsPage() {
 
   if (!user) return null;
 
-  const cards = [
+  const cardOptions = [
     {
       id: "virtual",
       type: "Virtual Card",
       price: 49.99,
-      description: "Instant delivery for online purchases",
+      description: "Instant digital delivery for online purchases",
       features: [
         "Instant digital delivery",
         "No shipping fees",
@@ -31,7 +31,9 @@ export default function CardsPage() {
       cta: "Buy Virtual Card",
       ctaLink: "/checkout/virtual",
       badge: "MOST POPULAR",
-      badgeColor: "bg-[#88D65E]"
+      badgeColor: "bg-[#88D65E]",
+      owned: cards.some(c => c.type === "virtual"),
+      status: cards.find(c => c.type === "virtual")?.status
     },
     {
       id: "physical",
@@ -44,12 +46,14 @@ export default function CardsPage() {
         "Contactless payments",
         "Works worldwide",
         "Priority support",
-        "Exclusive metal card holder"
+        "Premium card holder"
       ],
       cta: "Buy Physical Card",
       ctaLink: "/checkout/physical",
       badge: "PREMIUM",
-      badgeColor: "bg-gray-900"
+      badgeColor: "bg-gray-900",
+      owned: cards.some(c => c.type === "physical"),
+      status: cards.find(c => c.type === "physical")?.status
     }
   ];
 
@@ -79,17 +83,11 @@ export default function CardsPage() {
               </svg>
               My Cards
             </Link>
-            <Link href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-50 font-medium">
+            <Link href="/dashboard" onClick={() => {}} className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-50 font-medium">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
               </svg>
               Transactions
-            </Link>
-            <Link href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-50 font-medium">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              Deposit
             </Link>
           </nav>
         </aside>
@@ -120,8 +118,8 @@ export default function CardsPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {cards.map((card) => (
-                <div key={card.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-lg transition-shadow">
+              {cardOptions.map((card) => (
+                <div key={card.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden hover:shadow-lg transition-shadow ${card.owned ? 'border-[#88D65E]' : 'border-gray-200'}`}>
                   <div className="p-6 lg:p-8">
                     <div className="flex items-center justify-between mb-4">
                       {card.badge && (
@@ -129,25 +127,31 @@ export default function CardsPage() {
                           {card.badge}
                         </span>
                       )}
-                      {card.id === "virtual" && (
-                        <div className="w-20 h-12 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900 p-3 flex flex-col justify-between">
-                          <div className="flex justify-between">
-                            <div className="w-4 h-3 bg-yellow-400 rounded-sm"></div>
-                            <span className="text-white text-[8px] font-bold">VISA</span>
-                          </div>
-                          <div className="text-white text-[8px] font-mono">•••• 8831</div>
-                        </div>
-                      )}
-                      {card.id === "physical" && (
-                        <div className="w-20 h-12 rounded-lg bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 p-3 flex flex-col justify-between border border-gray-600">
-                          <div className="flex justify-between">
-                            <div className="w-4 h-3 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-sm"></div>
-                            <span className="text-white text-[8px] font-bold">VISA</span>
-                          </div>
-                          <div className="text-white text-[8px] font-mono">•••• 9927</div>
-                        </div>
+                      {card.owned && (
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${card.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                          {card.status === 'active' ? '✓ Active' : '✓ Ordered'}
+                        </span>
                       )}
                     </div>
+
+                    {card.id === "virtual" && (
+                      <div className="w-20 h-12 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900 p-3 flex flex-col justify-between mb-4">
+                        <div className="flex justify-between">
+                          <div className="w-4 h-3 bg-yellow-400 rounded-sm"></div>
+                          <span className="text-white text-[8px] font-bold">VISA</span>
+                        </div>
+                        <div className="text-white text-[8px] font-mono">•••• {card.owned ? '8831' : '----'}</div>
+                      </div>
+                    )}
+                    {card.id === "physical" && (
+                      <div className="w-20 h-12 rounded-lg bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 p-3 flex flex-col justify-between mb-4 border border-gray-600">
+                        <div className="flex justify-between">
+                          <div className="w-4 h-3 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-sm"></div>
+                          <span className="text-white text-[8px] font-bold">VISA</span>
+                        </div>
+                        <div className="text-white text-[8px] font-mono">•••• {card.owned ? '9927' : '----'}</div>
+                      </div>
+                    )}
 
                     <h3 className="text-xl font-extrabold text-gray-900 mb-2">{card.type}</h3>
                     <p className="text-gray-500 mb-6">{card.description}</p>
@@ -168,16 +172,22 @@ export default function CardsPage() {
                       ))}
                     </ul>
 
-                    <Link
-                      href={card.ctaLink}
-                      className={`block w-full py-4 text-center font-semibold rounded-xl transition-colors ${
-                        card.id === "virtual"
-                          ? "bg-[#88D65E] text-black hover:bg-[#76C14D]"
-                          : "bg-gray-900 text-white hover:bg-gray-800"
-                      }`}
-                    >
-                      {card.cta}
-                    </Link>
+                    {card.owned ? (
+                      <div className="w-full py-4 text-center font-semibold rounded-xl bg-green-50 text-green-700 border border-green-200">
+                        {card.status === 'active' ? 'Card Active' : 'Order Placed'}
+                      </div>
+                    ) : (
+                      <Link
+                        href={card.ctaLink}
+                        className={`block w-full py-4 text-center font-semibold rounded-xl transition-colors ${
+                          card.id === "virtual"
+                            ? "bg-[#88D65E] text-black hover:bg-[#76C14D]"
+                            : "bg-gray-900 text-white hover:bg-gray-800"
+                        }`}
+                      >
+                        {card.cta}
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))}
@@ -192,7 +202,7 @@ export default function CardsPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-white mb-1">Secure & Anonymous</h3>
-                  <p className="text-gray-400 text-sm">All cards are issued without KYC. Your data is encrypted and never shared with third parties. Spend with complete privacy.</p>
+                  <p className="text-gray-400 text-sm">All cards are issued without KYC. Your data is encrypted and never shared with third parties.</p>
                 </div>
               </div>
             </div>
