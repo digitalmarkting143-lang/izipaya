@@ -1,34 +1,13 @@
 "use client";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { signIn, signOut, useSession } from "next-auth/react";
 
-interface Card {
-  id: string;
-  type: "virtual" | "physical";
-  last4: string;
-  fullNumber: string;
-  expiryDate: string;
-  cvv: string;
-  cardholderName: string;
-  status: "active" | "ordered" | "frozen";
-  issueDate: string;
-  name: string;
-  isNumberVisible: boolean;
-  isCvvVisible: boolean;
-}
-
-interface Transaction {
-  id: string;
-  type: string;
-  amount: number;
-  status: "completed" | "pending";
-  date: string;
-  cardType: string;
-}
-
-interface User {
+export interface User {
   email: string;
   name: string;
+  provider?: "email" | "google";
+  image?: string;
 }
 
 interface AuthContextType {
@@ -36,8 +15,9 @@ interface AuthContextType {
   cards: Card[];
   transactions: Transaction[];
   login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  loginWithGoogle: () => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<boolean>;
+  logout: () => void;
   addCard: (type: "virtual" | "physical", cardholderName: string) => void;
   addTransaction: (type: string, amount: number, cardType: string) => void;
   toggleCardNumberVisibility: (cardId: string) => void;
@@ -80,30 +60,108 @@ function sanitizeCardholderName(name: string): string {
   return trimmed.toUpperCase();
 }
 
+interface Card {
+  id: string;
+  type: "virtual" | "physical";
+  last4: string;
+  fullNumber: string;
+  expiryDate: string;
+  cvv: string;
+  cardholderName: string;
+  status: "active" | "ordered" | "frozen";
+  issueDate: string;
+  name: string;
+  isNumberVisible: boolean;
+  isCvvVisible: boolean;
+}
+
+interface Transaction {
+  id: string;
+  type: string;
+  amount: number;
+  status: "completed" | "pending";
+  date: string;
+  cardType: string;
+}
+
+function migrateCard(card: any): Card {
+  return {
+    id: card?.id || Date.now().toString(),
+    type: card?.type || "virtual",
+    last4: card?.last4 || "0000",
+    fullNumber: card?.fullNumber || "",
+    expiryDate: card?.expiryDate || "12/28",
+    cvv: card?.cvv || "000",
+    cardholderName: card?.cardholderName || "IZIPAY USER",
+    status: card?.status || (card?.type === "physical" ? "ordered" : "active"),
+    issueDate: card?.issueDate || new Date().toLocaleDateString(),
+    name: card?.name || (card?.type === "physical" ? "Physical Metal Card" : "Virtual Card"),
+    isNumberVisible: card?.isNumberVisible || false,
+    isCvvVisible: card?.isCvvVisible || false,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const { data: session, status } = useSession();
 
   useEffect(() => {
     const storedUser = localStorage.getItem("izipay_user");
     const storedCards = localStorage.getItem("izipay_cards");
     const storedTransactions = localStorage.getItem("izipay_transactions");
     
-    if (storedUser) setUser(JSON.parse(storedUser));
-    if (storedCards) setCards(JSON.parse(storedCards));
-    if (storedTransactions) setTransactions(JSON.parse(storedTransactions));
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem("izipay_user");
+      }
+    }
+    if (storedCards) {
+      try {
+        const parsedCards = JSON.parse(storedCards);
+        const migratedCards = Array.isArray(parsedCards) ? parsedCards.map(migrateCard) : [];
+        setCards(migratedCards);
+      } catch {
+        localStorage.removeItem("izipay_cards");
+      }
+    }
+    if (storedTransactions) {
+      try {
+        setTransactions(JSON.parse(storedTransactions));
+      } catch {
+        localStorage.removeItem("izipay_transactions");
+      }
+    }
     setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (status === "loading") return;
+    
+    if (session?.user) {
+      const sessionUser = session.user as any;
+      const googleUser: User = {
+        email: sessionUser.email || "",
+        name: sessionUser.name || "Google User",
+        provider: "google",
+        image: sessionUser.image || undefined,
+      };
+      setUser(googleUser);
+      localStorage.setItem("izipay_user", JSON.stringify(googleUser));
+    }
+  }, [session, status]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 800));
     
     if (email === DEMO_USER.email && password === DEMO_USER.password) {
-      const userData = { email: DEMO_USER.email, name: DEMO_USER.name };
+      const userData = { email: DEMO_USER.email, name: DEMO_USER.name, provider: "email" as const };
       localStorage.setItem("izipay_user", JSON.stringify(userData));
       setUser(userData);
       setIsLoading(false);
@@ -114,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const foundUser = users.find((u: any) => u.email === email && u.password === password);
     
     if (foundUser) {
-      const userData = { email: foundUser.email, name: foundUser.name };
+      const userData = { email: foundUser.email, name: foundUser.name, provider: "email" as const };
       localStorage.setItem("izipay_user", JSON.stringify(userData));
       setUser(userData);
       setIsLoading(false);
@@ -123,6 +181,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     setIsLoading(false);
     return false;
+  };
+
+  const loginWithGoogle = async () => {
+    await signIn("google", { callbackUrl: "/dashboard" });
   };
 
   const register = async (email: string, password: string, name: string): Promise<boolean> => {
@@ -135,11 +197,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     }
     
-    const newUser = { email, password, name };
+    const newUser = { email, password, name, provider: "email", createdAt: new Date().toISOString() };
     users.push(newUser);
     localStorage.setItem("izipay_users", JSON.stringify(users));
     
-    const userData = { email, name };
+    const userData = { email, name, provider: "email" as const };
     localStorage.setItem("izipay_user", JSON.stringify(userData));
     setUser(userData);
     setIsLoading(false);
@@ -149,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem("izipay_user");
     setUser(null);
-    router.push("/login");
+    signOut({ callbackUrl: "/login" });
   };
 
   const addCard = (type: "virtual" | "physical", cardholderName: string) => {
@@ -225,7 +287,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ 
-      user, cards, transactions, login, logout, register, 
+      user, cards, transactions, login, loginWithGoogle, register, logout, 
       addCard, addTransaction, toggleCardNumberVisibility, 
       toggleCardCvvVisibility, freezeCard, unfreezeCard, isLoading 
     }}>

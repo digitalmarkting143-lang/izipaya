@@ -5,6 +5,28 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { CardDetailsModal } from "@/components/CardDetailsModal";
 
+const normalizeCard = (card: any) => ({
+  id: card?.id || "",
+  type: card?.type || "virtual",
+  last4: card?.last4 || "0000",
+  fullNumber: card?.fullNumber || "",
+  expiryDate: card?.expiryDate || "12/28",
+  cvv: card?.cvv || "000",
+  cardholderName: card?.cardholderName || "IZIPAY USER",
+  status: card?.status || "active",
+  name: card?.name || "Virtual Card",
+  issueDate: card?.issueDate || new Date().toISOString(),
+  isNumberVisible: card?.isNumberVisible || false,
+  isCvvVisible: card?.isCvvVisible || false,
+});
+
+const formatCardNumber = (card: ReturnType<typeof normalizeCard>): string => {
+  if (card.isNumberVisible && card.fullNumber) {
+    return card.fullNumber.replace(/(\d{4})/g, "$1 ").trim();
+  }
+  return `•••• •••• •••• ${card.last4}`;
+};
+
 export default function CardsPage() {
   const { user, cards, toggleCardNumberVisibility } = useAuth();
   const router = useRouter();
@@ -16,6 +38,8 @@ export default function CardsPage() {
 
   if (!user) return null;
 
+  const safeCards = cards.map(normalizeCard);
+
   const cardOptions = [
     {
       id: "virtual",
@@ -26,9 +50,7 @@ export default function CardsPage() {
       cta: "Buy Virtual Card",
       ctaLink: "/checkout/virtual",
       badge: "MOST POPULAR",
-      badgeColor: "bg-[#88D65E]",
-      owned: cards.some(c => c.type === "virtual"),
-      status: cards.find(c => c.type === "virtual")?.status
+      badgeColor: "bg-[#88D65E]"
     },
     {
       id: "physical",
@@ -39,16 +61,27 @@ export default function CardsPage() {
       cta: "Buy Physical Card",
       ctaLink: "/checkout/physical",
       badge: "PREMIUM",
-      badgeColor: "bg-gray-900",
-      owned: cards.some(c => c.type === "physical"),
-      status: cards.find(c => c.type === "physical")?.status
+      badgeColor: "bg-gray-900"
     }
   ];
+
+  const virtualCards = safeCards.filter(c => c.type === "virtual");
+  const physicalCards = safeCards.filter(c => c.type === "physical");
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     alert("Copied to clipboard!");
   };
+
+  const [cardFilter, setCardFilter] = useState<"all" | "virtual" | "physical">("all");
+  
+  const filteredCards = cardFilter === "all" 
+    ? safeCards 
+    : safeCards.filter(c => c.type === cardFilter);
+
+  const sortedCards = [...filteredCards].sort((a, b) => 
+    new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime()
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -102,11 +135,21 @@ export default function CardsPage() {
               <p className="text-gray-500 mt-1">Manage your crypto cards</p>
             </div>
 
-            {cards.length > 0 && (
+            {safeCards.length > 0 && (
               <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Purchased Cards</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Your Cards ({safeCards.length})</h3>
+                  <div className="flex gap-2">
+                    <button onClick={() => setCardFilter("all")} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${cardFilter === "all" ? "bg-[#88D65E] text-black" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>All</button>
+                    <button onClick={() => setCardFilter("virtual")} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${cardFilter === "virtual" ? "bg-[#88D65E] text-black" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>Virtual ({virtualCards.length})</button>
+                    <button onClick={() => setCardFilter("physical")} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${cardFilter === "physical" ? "bg-[#88D65E] text-black" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>Physical ({physicalCards.length})</button>
+                  </div>
+                </div>
+                {sortedCards.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No cards found for this filter.</p>
+                ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {cards.map((card) => (
+                  {sortedCards.map((card) => (
                     <div key={card.id} className={`relative bg-gradient-to-br ${card.type === "physical" ? "from-gray-700 via-gray-800 to-gray-900" : "from-gray-800 to-gray-900"} rounded-2xl p-6 text-white ${card.status === "frozen" ? "opacity-75" : ""}`}>
                       {card.status === "frozen" && <div className="absolute top-4 right-4 px-2 py-1 bg-red-500/20 text-red-400 text-xs font-medium rounded-full">Frozen</div>}
                       {card.status === "ordered" && <div className="absolute top-4 right-4 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full">Ordered</div>}
@@ -118,7 +161,7 @@ export default function CardsPage() {
                       </div>
                       
                       <div className="text-xl font-mono tracking-widest mb-4">
-                        {card.isNumberVisible ? card.fullNumber.replace(/(\d{4})/g, "$1 ").trim() : "•••• •••• •••• " + card.last4}
+                        {formatCardNumber(card)}
                       </div>
                       
                       <div className="flex justify-between items-end mb-4">
@@ -134,12 +177,13 @@ export default function CardsPage() {
                       
                       <div className="flex gap-2 mt-4">
                         <button onClick={() => toggleCardNumberVisibility(card.id)} className="p-2 bg-white/10 rounded-lg hover:bg-white/20 text-xs">{card.isNumberVisible ? "Hide" : "Show"}</button>
-                        <button onClick={() => copyToClipboard(card.fullNumber)} className="p-2 bg-white/10 rounded-lg hover:bg-white/20 text-xs">Copy</button>
+                        <button onClick={() => copyToClipboard(card.fullNumber || "")} className="p-2 bg-white/10 rounded-lg hover:bg-white/20 text-xs">Copy</button>
                         <button onClick={() => setSelectedCardId(card.id)} className="p-2 bg-white/10 rounded-lg hover:bg-white/20 text-xs">Details</button>
                       </div>
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             )}
 
@@ -147,23 +191,24 @@ export default function CardsPage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Get New Card</h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {cardOptions.map((card) => (
-                  <div key={card.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden hover:shadow-lg transition-shadow ${card.owned ? 'border-[#88D65E]' : 'border-gray-200'}`}>
+                  <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden hover:shadow-lg transition-shadow border-gray-200`}>
                     <div className="p-6 lg:p-8">
                       <div className="flex items-center justify-between mb-4">
                         {card.badge && <span className={`px-3 py-1 rounded-full text-xs font-bold text-white ${card.badgeColor}`}>{card.badge}</span>}
-                        {card.owned && <span className={`px-3 py-1 rounded-full text-xs font-medium ${card.status === 'active' ? 'bg-green-100 text-green-700' : card.status === 'frozen' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{card.status === 'active' ? '✓ Active' : card.status === 'frozen' ? '✓ Frozen' : '✓ Ordered'}</span>}
+                        {card.id === "virtual" && virtualCards.length > 0 && <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Owned ({virtualCards.length})</span>}
+                        {card.id === "physical" && physicalCards.length > 0 && <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Owned ({physicalCards.length})</span>}
                       </div>
 
                       {card.id === "virtual" && (
                         <div className="w-20 h-12 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900 p-3 flex flex-col justify-between mb-4">
                           <div className="flex justify-between"><div className="w-4 h-3 bg-yellow-400 rounded-sm"></div><span className="text-white text-[8px] font-bold">VISA</span></div>
-                          <div className="text-white text-[8px] font-mono">•••• {card.owned ? '----' : '----'}</div>
+                          <div className="text-white text-[8px] font-mono">•••• ----</div>
                         </div>
                       )}
                       {card.id === "physical" && (
                         <div className="w-20 h-12 rounded-lg bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 p-3 flex flex-col justify-between mb-4 border border-gray-600">
                           <div className="flex justify-between"><div className="w-4 h-3 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-sm"></div><span className="text-white text-[8px] font-bold">VISA</span></div>
-                          <div className="text-white text-[8px] font-mono">•••• {card.owned ? '----' : '----'}</div>
+                          <div className="text-white text-[8px] font-mono">•••• ----</div>
                         </div>
                       )}
 
@@ -184,11 +229,9 @@ export default function CardsPage() {
                         ))}
                       </ul>
 
-                      {card.owned ? (
-                        <div className="w-full py-4 text-center font-semibold rounded-xl bg-green-50 text-green-700 border border-green-200">{card.status === 'active' ? 'Card Active' : card.status === 'frozen' ? 'Card Frozen' : 'Order Placed'}</div>
-                      ) : (
-                        <Link href={card.ctaLink} className={`block w-full py-4 text-center font-semibold rounded-xl transition-colors ${card.id === "virtual" ? "bg-[#88D65E] text-black hover:bg-[#76C14D]" : "bg-gray-900 text-white hover:bg-gray-800"}`}>{card.cta}</Link>
-                      )}
+                      <Link href={card.ctaLink} className={`block w-full py-4 text-center font-semibold rounded-xl transition-colors ${card.id === "virtual" ? "bg-[#88D65E] text-black hover:bg-[#76C14D]" : "bg-gray-900 text-white hover:bg-gray-800"}`}>
+                        {card.id === "virtual" ? `Buy Another Virtual Card ($${card.price})` : `Buy Another Physical Card ($${card.price})`}
+                      </Link>
                     </div>
                   </div>
                 ))}
