@@ -11,6 +11,8 @@ export default function CheckoutPhysicalPage() {
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedNetwork, setSelectedNetwork] = useState("USDT");
+  const [cardholderName, setCardholderName] = useState("");
+  const [generatedCard, setGeneratedCard] = useState<any>(null);
 
   useEffect(() => {
     if (!user) router.push("/login");
@@ -37,14 +39,23 @@ export default function CheckoutPhysicalPage() {
   const handlePaymentComplete = () => {
     setIsProcessing(true);
     setTimeout(() => {
-      addCard("physical");
+      const fullNumber = "5425" + Math.floor(10000000 + Math.random() * 90000000).toString();
+      const card = {
+        last4: fullNumber.slice(-4),
+        fullNumber,
+        expiryDate: "12/28",
+        cvv: Math.floor(100 + Math.random() * 900).toString(),
+        cardholderName: cardholderName.trim() || "IZIPAY USER"
+      };
+      setGeneratedCard(card);
+      addCard("physical", cardholderName.trim() || "IZIPAY USER");
       addTransaction("Physical Metal Card Purchase", amount, "Physical Metal Card");
       setIsProcessing(false);
       setPaymentComplete(true);
     }, 1500);
   };
 
-  if (paymentComplete) {
+  if (paymentComplete && generatedCard) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
@@ -61,10 +72,10 @@ export default function CheckoutPhysicalPage() {
               <div className="w-8 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-sm"></div>
               <span className="text-xs font-bold">VISA</span>
             </div>
-            <div className="text-xl font-mono tracking-widest mb-2">•••• •••• •••• 9927</div>
+            <div className="text-xl font-mono tracking-widest mb-2">{generatedCard.fullNumber.replace(/(\d{4})/g, "$1 ").trim()}</div>
             <div className="flex justify-between text-xs">
-              <span>IZIPAY USER</span>
-              <span>12/28</span>
+              <span>{generatedCard.cardholderName}</span>
+              <span>{generatedCard.expiryDate}</span>
             </div>
           </div>
 
@@ -143,7 +154,20 @@ export default function CheckoutPhysicalPage() {
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 lg:p-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Network</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Cardholder Name</h2>
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={cardholderName}
+                  onChange={(e) => setCardholderName(e.target.value)}
+                  placeholder="Enter cardholder name"
+                  maxLength={24}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#88D65E] focus:ring-1 focus:ring-[#88D65E]"
+                />
+                <p className="text-xs text-gray-500 mt-2">Will appear on your metal card. Max 24 characters.</p>
+              </div>
+
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 mt-6">Select Network</h2>
               <div className="grid grid-cols-3 gap-3">
                 {networks.map((network) => (
                   <button

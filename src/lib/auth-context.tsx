@@ -6,10 +6,15 @@ interface Card {
   id: string;
   type: "virtual" | "physical";
   last4: string;
-  status: "active" | "ordered";
-  issueDate: string;
+  fullNumber: string;
   expiryDate: string;
+  cvv: string;
+  cardholderName: string;
+  status: "active" | "ordered" | "frozen";
+  issueDate: string;
   name: string;
+  isNumberVisible: boolean;
+  isCvvVisible: boolean;
 }
 
 interface Transaction {
@@ -33,8 +38,12 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   register: (email: string, password: string, name: string) => Promise<boolean>;
-  addCard: (type: "virtual" | "physical") => void;
+  addCard: (type: "virtual" | "physical", cardholderName: string) => void;
   addTransaction: (type: string, amount: number, cardType: string) => void;
+  toggleCardNumberVisibility: (cardId: string) => void;
+  toggleCardCvvVisibility: (cardId: string) => void;
+  freezeCard: (cardId: string) => void;
+  unfreezeCard: (cardId: string) => void;
   isLoading: boolean;
 }
 
@@ -45,6 +54,31 @@ const DEMO_USER = {
   password: "Demo@12345",
   name: "Demo User"
 };
+
+function generateDemoCardNumber(): string {
+  const prefixes = ["4532", "5425", "3714", "6011"];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const middle = Math.floor(1000 + Math.random() * 9000).toString();
+  const suffix = Math.floor(1000 + Math.random() * 9000).toString();
+  return prefix + middle + suffix;
+}
+
+function generateDemoCvv(): string {
+  return Math.floor(100 + Math.random() * 900).toString();
+}
+
+function generateExpiryDate(): string {
+  const year = 2027 + Math.floor(Math.random() * 3);
+  const month = Math.floor(1 + Math.random() * 12).toString().padStart(2, "0");
+  return `${month}/${year.toString().slice(-2)}`;
+}
+
+function sanitizeCardholderName(name: string): string {
+  const trimmed = name.trim().replace(/\s+/g, " ");
+  if (!trimmed) return "IZIPAY USER";
+  if (trimmed.length > 24) return trimmed.slice(0, 24);
+  return trimmed.toUpperCase();
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -118,17 +152,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   };
 
-  const addCard = (type: "virtual" | "physical") => {
-    const cardNum = type === "virtual" ? "8831" : "9927";
+  const addCard = (type: "virtual" | "physical", cardholderName: string) => {
+    const fullNumber = generateDemoCardNumber();
+    const last4 = fullNumber.slice(-4);
+    const sanitizedName = sanitizeCardholderName(cardholderName);
+    
     const newCard: Card = {
       id: Date.now().toString(),
       type,
-      last4: cardNum,
+      last4,
+      fullNumber,
+      expiryDate: generateExpiryDate(),
+      cvv: generateDemoCvv(),
+      cardholderName: sanitizedName,
       status: type === "virtual" ? "active" : "ordered",
       issueDate: new Date().toLocaleDateString(),
-      expiryDate: "12/28",
-      name: "IZIPAY USER"
+      name: type === "virtual" ? "Virtual Card" : "Physical Metal Card",
+      isNumberVisible: false,
+      isCvvVisible: false
     };
+    
     const updatedCards = [...cards, newCard];
     setCards(updatedCards);
     localStorage.setItem("izipay_cards", JSON.stringify(updatedCards));
@@ -148,8 +191,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("izipay_transactions", JSON.stringify(updatedTransactions));
   };
 
+  const toggleCardNumberVisibility = (cardId: string) => {
+    const updatedCards = cards.map(card => 
+      card.id === cardId ? { ...card, isNumberVisible: !card.isNumberVisible } : card
+    );
+    setCards(updatedCards);
+    localStorage.setItem("izipay_cards", JSON.stringify(updatedCards));
+  };
+
+  const toggleCardCvvVisibility = (cardId: string) => {
+    const updatedCards = cards.map(card => 
+      card.id === cardId ? { ...card, isCvvVisible: !card.isCvvVisible } : card
+    );
+    setCards(updatedCards);
+    localStorage.setItem("izipay_cards", JSON.stringify(updatedCards));
+  };
+
+  const freezeCard = (cardId: string) => {
+    const updatedCards = cards.map(card => 
+      card.id === cardId ? { ...card, status: "frozen" as const } : card
+    );
+    setCards(updatedCards);
+    localStorage.setItem("izipay_cards", JSON.stringify(updatedCards));
+  };
+
+  const unfreezeCard = (cardId: string) => {
+    const updatedCards = cards.map(card => 
+      card.id === cardId ? { ...card, status: "active" as const } : card
+    );
+    setCards(updatedCards);
+    localStorage.setItem("izipay_cards", JSON.stringify(updatedCards));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, cards, transactions, login, logout, register, addCard, addTransaction, isLoading }}>
+    <AuthContext.Provider value={{ 
+      user, cards, transactions, login, logout, register, 
+      addCard, addTransaction, toggleCardNumberVisibility, 
+      toggleCardCvvVisibility, freezeCard, unfreezeCard, isLoading 
+    }}>
       {children}
     </AuthContext.Provider>
   );
