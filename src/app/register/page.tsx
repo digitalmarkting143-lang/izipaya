@@ -4,21 +4,32 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 
-export default function LoginPage() {
+export default function RegisterPage() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [marketingEmails, setMarketingEmails] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { register } = useAuth();
   const router = useRouter();
+
+  const passwordRequirements = [
+    { met: password.length >= 8, text: "At least 8 characters" },
+    { met: /[A-Z]/.test(password), text: "One uppercase letter" },
+    { met: /[a-z]/.test(password), text: "One lowercase letter" },
+    { met: /[0-9]/.test(password), text: "One number" },
+    { met: /[^A-Za-z0-9]/.test(password), text: "One special character" },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     
-    if (!email || !password) {
+    if (!name || !email || !password || !confirmPassword) {
       setError("Please fill in all fields");
       return;
     }
@@ -27,15 +38,31 @@ export default function LoginPage() {
       setError("Please enter a valid email address");
       return;
     }
+    
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    
+    if (!agreeTerms) {
+      setError("Please agree to the Terms of Service");
+      return;
+    }
+
+    const allRequirementsMet = passwordRequirements.every(req => req.met);
+    if (!allRequirementsMet) {
+      setError("Please meet all password requirements");
+      return;
+    }
 
     setIsLoading(true);
-    const success = await login(email, password);
+    const success = await register(email, password, name);
     setIsLoading(false);
     
     if (success) {
       router.push("/dashboard");
     } else {
-      setError("Invalid email or password. Try demo@izipay.com / Demo@12345");
+      setError("An account with this email already exists");
     }
   };
 
@@ -50,8 +77,8 @@ export default function LoginPage() {
             <span className="text-xl font-extrabold text-white">IZIPAY</span>
           </Link>
 
-          <h1 className="text-2xl font-extrabold mb-2 text-white">Welcome back</h1>
-          <p className="text-gray-400 text-sm mb-8">Sign in to access your crypto cards</p>
+          <h1 className="text-2xl font-extrabold mb-2 text-white">Create your account</h1>
+          <p className="text-gray-400 text-sm mb-8">Start spending crypto instantly with no KYC</p>
 
           {error && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
@@ -60,6 +87,17 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Full Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-[#88D65E] focus:ring-1 focus:ring-[#88D65E] transition-all"
+                placeholder="Enter your full name"
+              />
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
               <input
@@ -79,7 +117,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-[#88D65E] focus:ring-1 focus:ring-[#88D65E] transition-all pr-12"
-                  placeholder="Enter your password"
+                  placeholder="Create a password"
                 />
                 <button
                   type="button"
@@ -98,19 +136,60 @@ export default function LoginPage() {
                   )}
                 </button>
               </div>
+              
+              {password && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {passwordRequirements.map((req, index) => (
+                    <div key={index} className={`flex items-center gap-2 text-xs ${req.met ? "text-[#88D65E]" : "text-gray-500"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${req.met ? "bg-[#88D65E]" : "bg-gray-600"}`}></span>
+                      {req.text}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Confirm Password</label>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-[#88D65E] focus:ring-1 focus:ring-[#88D65E] transition-all"
+                placeholder="Confirm your password"
+              />
+              {confirmPassword && password !== confirmPassword && (
+                <p className="mt-2 text-xs text-red-400">Passwords do not match</p>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-600 bg-gray-900 text-[#88D65E] focus:ring-[#88D65E] focus:ring-offset-0"
+                  checked={agreeTerms}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-900 text-[#88D65E] focus:ring-[#88D65E] focus:ring-offset-0"
                 />
-                <span className="text-sm text-gray-400">Remember me</span>
+                <span className="text-sm text-gray-400">
+                  I agree to the{" "}
+                  <Link href="/terms" className="text-[#88D65E] hover:underline">Terms of Service</Link>
+                  {" "}and{" "}
+                  <Link href="/privacy" className="text-[#88D65E] hover:underline">Privacy Policy</Link>
+                </span>
               </label>
-              <Link href="#" className="text-sm text-[#88D65E] hover:underline">Forgot password?</Link>
+
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={marketingEmails}
+                  onChange={(e) => setMarketingEmails(e.target.checked)}
+                  className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-900 text-[#88D65E] focus:ring-[#88D65E] focus:ring-offset-0"
+                />
+                <span className="text-sm text-gray-400">
+                  Send me product updates and news
+                </span>
+              </label>
             </div>
 
             <button
@@ -121,10 +200,10 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                  Signing in...
+                  Creating account...
                 </>
               ) : (
-                "Secure Login"
+                "Create Account"
               )}
             </button>
           </form>
@@ -149,9 +228,9 @@ export default function LoginPage() {
           </button>
 
           <p className="mt-8 text-center text-sm text-gray-500">
-            Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-[#88D65E] font-semibold hover:underline">
-              Create one
+            Already have an account?{" "}
+            <Link href="/login" className="text-[#88D65E] font-semibold hover:underline">
+              Sign in
             </Link>
           </p>
         </div>
@@ -175,22 +254,22 @@ export default function LoginPage() {
               </div>
             </div>
             
-            <h2 className="text-3xl font-extrabold text-white mb-4">IZIPAY</h2>
-            <p className="text-gray-400 max-w-md mx-auto">The future of crypto spending. Anonymous, instant, global. No KYC required.</p>
+            <h2 className="text-3xl font-extrabold text-white mb-4">Join IZIPAY</h2>
+            <p className="text-gray-400 max-w-md mx-auto">Get instant virtual cards. Spend crypto anywhere. No bank account needed.</p>
             
-            <div className="mt-8 flex items-center justify-center gap-6 text-gray-500 text-sm">
-              <span className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-[#88D65E]" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
-                No KYC
-              </span>
-              <span className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-[#88D65E]" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
-                Instant
-              </span>
-              <span className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-[#88D65E]" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
-                Global
-              </span>
+            <div className="mt-8 grid grid-cols-3 gap-4 text-center">
+              <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-800">
+                <div className="text-2xl font-bold text-[#88D65E] mb-1">$49</div>
+                <div className="text-xs text-gray-500">Virtual Card</div>
+              </div>
+              <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-800">
+                <div className="text-2xl font-bold text-[#88D65E] mb-1">0</div>
+                <div className="text-xs text-gray-500">KYC Required</div>
+              </div>
+              <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-800">
+                <div className="text-2xl font-bold text-[#88D65E] mb-1">∞</div>
+                <div className="text-xs text-gray-500">Global Use</div>
+              </div>
             </div>
           </div>
         </div>
