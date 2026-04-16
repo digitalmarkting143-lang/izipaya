@@ -66,6 +66,15 @@ export default function RegisterPage() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      setError("Google sign-in is not configured. Please contact the administrator.");
+      return;
+    }
+    await loginWithGoogle();
+  };
+
   return (
     <div className="min-h-screen bg-black flex">
       <div className="flex-1 flex items-center justify-center px-6 py-12 lg:px-12">
@@ -218,7 +227,7 @@ export default function RegisterPage() {
           </div>
 
           <button 
-            onClick={() => loginWithGoogle()} 
+            onClick={handleGoogleLogin} 
             className="w-full py-3.5 px-4 bg-gray-900/50 hover:bg-gray-800 border border-gray-700 rounded-xl font-semibold text-white flex items-center justify-center gap-3 transition-all duration-300"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
