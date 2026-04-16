@@ -184,11 +184,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loginWithGoogle = async () => {
-    const hasGoogleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!hasGoogleClientId) {
-      alert("Google sign-in is not configured. Please contact the administrator.");
-      return;
-    }
     await signIn("google", { callbackUrl: "/dashboard" });
   };
 
