@@ -4,7 +4,7 @@ export async function GET() {
   const googleClientId = process.env.GOOGLE_CLIENT_ID || "";
   const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
   const isConfigured = googleClientId.length > 0 && googleClientSecret.length > 0;
-  const nextauthUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const nextauthUrl = process.env.NEXTAUTH_URL || "https://sandybrown-stinkbug-922112.hostingersite.com";
   const callbackUrl = `${nextauthUrl}/api/auth/callback/google`;
 
   return NextResponse.json({

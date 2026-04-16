@@ -36,7 +36,7 @@ export default function IntegrationsPage() {
 
   const callbackUrl = typeof window !== "undefined" 
     ? `${window.location.origin}/api/auth/callback/google`
-    : "http://localhost:3000/api/auth/callback/google";
+    : "https://sandybrown-stinkbug-922112.hostingersite.com/api/auth/callback/google";
 
   if (loading) {
     return (
@@ -130,7 +130,7 @@ export default function IntegrationsPage() {
               <li>Add Authorized JavaScript origins:
                 <ul className="list-disc list-inside ml-4 mt-1">
                   <li><code className="text-[#88D65E]">http://localhost:3000</code></li>
-                  <li><code className="text-[#88D65E]">https://your-domain.com</code></li>
+                  <li><code className="text-[#88D65E]">https://sandybrown-stinkbug-922112.hostingersite.com</code></li>
                 </ul>
               </li>
               <li>Add Authorized redirect URIs:
